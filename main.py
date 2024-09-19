@@ -8,7 +8,9 @@ from time import sleep
 PAIR_IDX = 0
 LEFT_MOTOR = port.E
 RIGHT_MOTOR = port.F
-WHEEL_DIAM = 82         # millimeters
+WHEEL_DIAM = 82        # millimeters
+MAX_VELOCITY = 300
+MIN_VELOCITY = 50
 
 motor_pair.pair(PAIR_IDX, LEFT_MOTOR, RIGHT_MOTOR)
 
@@ -31,13 +33,21 @@ async def turn_to_angle(target_yaw: int, sleep_ms: int = 10):
     error = target_yaw
     print("turn to angle: ", target_yaw)
 
-    while True: 
+    while True:
         current_yaw = motion_sensor.tilt_angles()[0]
         error = target_yaw - current_yaw
         if abs(error) < 5:
             break
         steering = -100 * signum(error)
-        motor_pair.move(PAIR_IDX, steering)
+        v = abs(int(error/2))
+
+        if v > MAX_VELOCITY:
+            v = MAX_VELOCITY
+        if v > 0 and v < MIN_VELOCITY:
+            v = MIN_VELOCITY
+        print (error, target_yaw, current_yaw, v, steering)
+
+        motor_pair.move(PAIR_IDX, steering, velocity=v)
     motor_pair.stop(PAIR_IDX)
     await runloop.sleep_ms(sleep_ms)
 
@@ -52,10 +62,9 @@ async def drive_straight(target_distance: int, sleep_ms: int = 10):
 
 
 async def main():
-    await drive_straight(95)
-    await turn_to_angle(400)
-    await drive_straight(500)
-    await drive_straight(-500)
-    await turn_to_angle(-400)
+
+    while True:
+        await turn_to_angle(1350, sleep_ms=100)
+        await turn_to_angle(-1350, sleep_ms=100)
 
 runloop.run(main())
