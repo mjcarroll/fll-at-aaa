@@ -67,6 +67,7 @@ async def drive_straight(target_distance: int, sleep_ms: int = 10, velocity=500,
     await runloop.sleep_ms(sleep_ms)
 
 
+
 async def main():
     await drive_straight(635)
     await turn_to_angle(900)
@@ -87,7 +88,7 @@ async def run1():
     await drive_straight(755)
     await turn_to_angle(900)
     await drive_straight(79)
-    
+
     await motor.run_for_degrees(ACC_LOW, -200, 600)
     await drive_straight(-110)
     await turn_to_angle(-900)
@@ -129,4 +130,31 @@ async def run3():
     await drive_straight(25)
 
 
-runloop.run(run3())
+async def run4():
+    motor.run(ACC_HIGH, -5000)
+
+
+async def run5():
+    #get the plant thing !!!!DO LAST!!!!!!!!!
+    await drive_straight(-300, velocity=650, acceleration=5000)
+    await drive_straight(300, velocity=500, acceleration=4500)
+    await drive_straight(-450, velocity=650, acceleration=5000)
+    await drive_straight(-100, velocity=200, acceleration=500)
+    await drive_straight(550)
+
+async def move_submarine():
+    #motor.run_for_degrees(ACC_HIGH, 600,500)
+    await drive_straight(760)
+    await motor.run_for_degrees(ACC_LOW, -185, 650)
+    await drive_straight(-130, 750, 4500)
+    await turn_to_angle(-190)
+    await drive_straight(90)
+    await turn_to_angle(-420)
+    await drive_straight(160)
+    await motor.run_for_degrees(ACC_HIGH, 540, 500)
+    await turn_to_angle(300)
+    await drive_straight(100)
+    await motor.run_for_degrees(ACC_LOW, 80, 500)
+
+
+runloop.run(move_submarine())
