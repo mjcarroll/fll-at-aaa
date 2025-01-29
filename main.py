@@ -177,44 +177,6 @@ async def red_pickup():
     await drive_straight(750)
     return
 
-    # turn and get first krill
-    await turn_to_angle(200)
-    await drive_straight(-220, velocity=vel, acceleration=accel)
-
-    # turn and get coral
-    await turn_to_angle(350)
-    await drive_straight(-230, velocity=vel, acceleration=accel)
-
-    # turn and get second krill (near sonar)
-    await turn_to_angle(-500)
-    await drive_straight(-190, velocity=vel, acceleration=accel)
-    await drive_straight(70)
-
-    # Turn and get last krill
-    await turn_to_angle(850)
-    await drive_straight(-150, velocity=vel, acceleration=accel)
-    await drive_straight(50)
-
-    # Turn and get sample
-    await turn_to_angle(345)
-    await drive_straight(-155)
-    await drive_straight(55)
-    # await drive_straight(-50)
-
-    # Back up
-    await drive_straight(105)
-    await turn_to_angle(-1270)
-    await drive_straight(70)
-    await motor.run_for_degrees(ACC_LOW, 60, 500)
-    await drive_straight(90)
-
-    # Go home!
-    await drive_straight(-60)
-    await turn_to_angle(400)
-    motor.run_for_degrees(ACC_LOW, -60, 500)
-    await drive_straight(600, velocity=vel, acceleration=accel)
-
-
 async def send_sub_and_lanternfish():
     """
     originally we used two arms to lift, but got it working with one
@@ -254,41 +216,6 @@ async def send_sub_and_lanternfish():
     await drive_straight(-500, velocity=600, curve=10)
     await motor.run_for_degrees(ACC_LOW, -200, 400)
     await motor.run_for_degrees(ACC_HIGH, 200, 400)
-    '''
-    motor.run_for_degrees(ACC_HIGH, -175, 500)
-    # motor.run_for_degrees(ACC_LOW, -200, 500)
-    await drive_straight(865)
-    for ii in range(0, 10):
-        motor.run_for_degrees(ACC_HIGH, 50, 1000)
-        # motor.run_for_degrees(ACC_LOW, 25, 1000)
-        await runloop.sleep_ms(200)
-    await drive_straight(-260)
-    await turn_to_angle(-450)
-    await motor.run_for_degrees(ACC_LOW, -300, 400)
-    await drive_straight(495)
-    await motor.run_for_degrees(ACC_LOW, 300, 400)
-
-    if DO_SOIL:
-        # this sometimes works, decide if we want to keep it or not
-        # set DO_SOIL at top
-        await drive_straight(-150)
-        await motor.run_for_degrees(ACC_HIGH, -360, 1000)
-        await motor.run_for_degrees(ACC_HIGH, 160, 400)
-        await drive_straight(300)
-        await motor.run_for_degrees(ACC_HIGH, 160, 400)
-        await drive_straight(-500)
-        await turn_to_angle(-300)
-        await drive_straight(-500)
-    else:
-        # just go home
-        await drive_straight(-50)
-        await turn_to_angle(550)
-        await drive_straight(-500, velocity=600)
-        await turn_to_angle(-300)
-        await drive_straight(-500, velocity=600)
-        await motor.run_for_degrees(ACC_LOW, -200, 400)
-        await motor.run_for_degrees(ACC_HIGH, 200, 400)
-        '''
 
 
 async def sonar_and_critter():
