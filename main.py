@@ -1,6 +1,6 @@
 ######### IMPORTS
 import math
-
+import color_sensor
 import runloop
 import motor
 import motor_pair
@@ -65,7 +65,7 @@ async def turn_to_angle(target_yaw: int, sleep_ms: int = 10):
             v = MAX_TURN_VELOCITY
         if v > 0 and v < MIN_TURN_VELOCITY:
             v = MIN_TURN_VELOCITY
-        print(error, target_yaw, current_yaw, v, steering)
+        #print(error, target_yaw, current_yaw, v, steering)
         motor_pair.move(PAIR_IDX, steering, velocity=v)
     motor_pair.stop(PAIR_IDX)
     await runloop.sleep_ms(sleep_ms)
@@ -76,6 +76,7 @@ async def drive_straight(
     sleep_ms: int = 10,
     velocity: int = 500,
     acceleration: int = 1000,
+    curve: int = 0,
 ):
     """
     target_distance: Distance to move in millimeters
@@ -88,12 +89,13 @@ async def drive_straight(
     await motor_pair.move_for_degrees(
         PAIR_IDX,
         degrees_to_move,
-        0,
+        curve,
         velocity=velocity,
         acceleration=acceleration,
         stop=motor.SMART_BRAKE,
     )
-    await runloop.sleep_ms(sleep_ms)
+    if sleep_ms > 0:
+        await runloop.sleep_ms(sleep_ms)
 
 
 async def reset():
@@ -173,8 +175,6 @@ async def red_pickup():
     await turn_to_angle(350)
     motor.run_for_degrees(ACC_LOW, -60, 500)
     await drive_straight(750)
-
-
     return
 
     # turn and get first krill
@@ -196,13 +196,13 @@ async def red_pickup():
     await drive_straight(50)
 
     # Turn and get sample
-    await turn_to_angle(350)
-    await drive_straight(-150)
-    await drive_straight(50)
+    await turn_to_angle(345)
+    await drive_straight(-155)
+    await drive_straight(55)
     # await drive_straight(-50)
 
     # Back up
-    await drive_straight(110)
+    await drive_straight(105)
     await turn_to_angle(-1270)
     await drive_straight(70)
     await motor.run_for_degrees(ACC_LOW, 60, 500)
@@ -220,6 +220,41 @@ async def send_sub_and_lanternfish():
     originally we used two arms to lift, but got it working with one
     uncomment to use other arm
     """
+    await drive_straight(380)
+    await turn_to_angle(-450)
+    await motor.run_for_degrees(ACC_HIGH, -190, 1000)
+    await drive_straight(500)
+    exit = ""
+    while len(exit) == 0:
+        await drive_straight(20)
+        if (color_sensor.color(SNS_LEFT) == color.WHITE and
+            color_sensor.color(SNS_RIGHT) == color.WHITE):
+            exit = "white"
+        if (color_sensor.color(SNS_LEFT) == color.BLACK and
+            color_sensor.color(SNS_RIGHT) == color.BLACK):
+            exit = "black"
+    print("Exit: ", exit)
+
+    if exit == "black":
+        await drive_straight(-10) # this is a backup backup code
+    await motor.run_for_degrees(ACC_HIGH, 125, 1000)
+    await runloop.sleep_ms(200)
+    await motor.run_for_degrees(ACC_HIGH, -125, 1000)
+
+    await drive_straight(-200)
+    await turn_to_angle(-490)
+    await motor.run_for_degrees(ACC_LOW, -300, 400)
+    await drive_straight(495)
+    await motor.run_for_degrees(ACC_LOW, 300, 400)
+    await drive_straight(-50)
+    await turn_to_angle(550)
+    await drive_straight(-500, velocity=600, sleep_ms=0)
+    #await turn_to_angle(-280)
+    # await drive_straight(-500, velocity=600)
+    await drive_straight(-500, velocity=600, curve=10)
+    await motor.run_for_degrees(ACC_LOW, -200, 400)
+    await motor.run_for_degrees(ACC_HIGH, 200, 400)
+    '''
     motor.run_for_degrees(ACC_HIGH, -175, 500)
     # motor.run_for_degrees(ACC_LOW, -200, 500)
     await drive_straight(865)
@@ -253,6 +288,7 @@ async def send_sub_and_lanternfish():
         await drive_straight(-500, velocity=600)
         await motor.run_for_degrees(ACC_LOW, -200, 400)
         await motor.run_for_degrees(ACC_HIGH, 200, 400)
+        '''
 
 
 async def sonar_and_critter():
@@ -328,13 +364,17 @@ async def cross_field():
     """
     get from blue to red
     """
-    await drive_straight(400, velocity=1000)
-    await turn_to_angle(200)
-    await drive_straight(270, velocity=1000)
-    await turn_to_angle(-200)
-    await drive_straight(600, velocity=1000)
-    await turn_to_angle(-300)
-    await drive_straight(500, velocity=1000)
+    if True:
+        await drive_straight(1000, velocity=1000, sleep_ms=0)
+        await drive_straight(1000, velocity=1000, curve=-5)
+    else:
+        await drive_straight(400, velocity=1000)
+        await turn_to_angle(200)
+        await drive_straight(270, velocity=1000)
+        await turn_to_angle(-200)
+        await drive_straight(600, velocity=1000)
+        await turn_to_angle(-300)
+        await drive_straight(500, velocity=1000)
 
 
 async def blue_pickup():
@@ -419,10 +459,10 @@ runs = [
     #("4", run5),# flip up
     ("5", sonar_and_critter),
     ("C", cross_field),
-    ("7", blue_pickup),
+    # ("7", blue_pickup),
     ("8", shark_and_stuff),
     ("S", push_shark),
-    ("P", push_coral),
+    # ("P", push_coral),
     ("L", lift_the_coral),
 
     #("+", motor_test_up),
