@@ -101,21 +101,74 @@ async def drive_straight(
 async def artbots():
     await light_matrix.write("ARTBOTS")
 
-async def run1():
-    """
-    Reveal the site and brush
-    """
-    await drive_straight(775)
+async def boat():
+    await drive_straight(650, velocity=450)
+    await drive_straight(-650, velocity=450)
+
+async def surface_brushing_map_reveal():
+    await drive_straight(754, velocity=600)
+    await turn_to_angle(-345)
+    await runloop.sleep_ms(10)
+    await drive_straight(145, velocity=200)
+    await motor.run_for_degrees(ACC_HIGH, 300, 500)
+    await drive_straight(-30, acceleration=1500)
+    await drive_straight(-135)
     await turn_to_angle(-430)
-    await drive_straight(150)
-    await motor.run_for_degrees(ACC_HIGH, 270, 500)
+    await drive_straight(120)
+    await motor.run_for_degrees(ACC_LOW, 750, 500)
+    await motor.run_for_degrees(ACC_LOW, -750, 500)
+    await drive_straight(-100)
+    await motor.run_for_degrees(ACC_HIGH, -550, 500)
+    await drive_straight(40)
+    await motor.run_for_degrees(ACC_HIGH, 500, 500)
+    await drive_straight(-200)
+    await turn_to_angle(-1300)
+    await motor.run_for_degrees(ACC_HIGH, -400, 500)
+
+async def who_lived_and_forge():
+    await drive_straight(790)
+    await turn_to_angle(470)
+    await drive_straight(50)
+    color_check = True
+    while(color_check):
+        await drive_straight(5)
+        if color_sensor.color(SNS_LEFT) is color.WHITE and color_sensor.color(SNS_RIGHT) is color.WHITE:
+            color_check = False
+    await turn_to_angle(-500, sleep_ms=200)
+    await drive_straight(50)
+    await turn_to_angle(-375)
+    await drive_straight(-100)
+    await turn_to_angle(-550)
+    await drive_straight(-420)
+    await turn_to_angle(900)
+    await drive_straight(40)
+    await turn_to_angle(-200)
+    await drive_straight(-20)
     return
+
+async def tip_the_scales():
+    await drive_straight(775)
+    await turn_to_angle(-900)
+    await drive_straight(-200)
+    await drive_straight(200)
+    await turn_to_angle(-700)
+    await drive_straight(670, velocity=1000)
+    await turn_to_angle(125)
+    await runloop.sleep_ms(2000)
+    await drive_straight(-1250, velocity=1000)
+    await drive_straight(100, acceleration=1500)
+    pass
 
 ##### RUN LIST
 # keeps a list of run name and run function
 runs = [
     #("0", artbots),
-    ("1", run1),
+    # From the RED SIDE
+    ("1", surface_brushing_map_reveal),
+    ("2", boat),
+    # From the BLUE SIDE
+    ("3", who_lived_and_forge),
+    ("4", tip_the_scales)
 ]
 
 ###### MAIN FUNCTION
