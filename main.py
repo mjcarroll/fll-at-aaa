@@ -126,24 +126,31 @@ async def surface_brushing_map_reveal():
     await motor.run_for_degrees(ACC_HIGH, -400, 500)
 
 async def who_lived_and_forge():
-    await drive_straight(790)
-    await turn_to_angle(470)
-    await drive_straight(50)
-    color_check = True
-    while(color_check):
-        await drive_straight(5)
-        if color_sensor.color(SNS_LEFT) is color.WHITE and color_sensor.color(SNS_RIGHT) is color.WHITE:
-            color_check = False
-    await turn_to_angle(-500, sleep_ms=200)
-    await drive_straight(50)
-    await turn_to_angle(-375)
-    await drive_straight(-100)
-    await turn_to_angle(-550)
-    await drive_straight(-420)
-    await turn_to_angle(900)
-    await drive_straight(40)
-    await turn_to_angle(-200)
-    await drive_straight(-20)
+    # LINE UP: right corner robot 8 squares from left (1 square RIGHT from 2nd black mark on left) 
+    if True:
+        await drive_straight(705)
+        await turn_to_angle(450)
+        await drive_straight(25)
+        color_check = True
+        while(color_check):
+            await drive_straight(5)
+            if color_sensor.color(SNS_LEFT) is color.WHITE and color_sensor.color(SNS_RIGHT) is color.WHITE:
+                color_check = False
+        # turn to dump rocks 
+        await turn_to_angle(-700, sleep_ms=200)
+        await drive_straight(30)
+        await turn_to_angle(-150) # flip who lived here
+        await drive_straight(-50)
+        await turn_to_angle(-500) # backup to move rocks
+        await drive_straight(-420)
+        await turn_to_angle(620) # set up to pick up millstone
+    await motor.run_for_degrees(ACC_LOW, -115, 500) # drop arm
+    await drive_straight(35)
+    await turn_to_angle(-100)
+    await motor.run_for_degrees(ACC_LOW, 115, 100) # pick up millstone
+    await turn_to_angle(100)
+    await drive_straight(-35)
+    await drive_straight(-520)
     return
 
 async def tip_the_scales():
@@ -162,13 +169,15 @@ async def tip_the_scales():
 ##### RUN LIST
 # keeps a list of run name and run function
 runs = [
+    ("3", who_lived_and_forge),
+
     #("0", artbots),
     # From the RED SIDE
     ("1", surface_brushing_map_reveal),
     ("2", boat),
     # From the BLUE SIDE
-    ("3", who_lived_and_forge),
-    ("4", tip_the_scales)
+    # ("3", who_lived_and_forge),
+    #("4", tip_the_scales)
 ]
 
 ###### MAIN FUNCTION
