@@ -21,12 +21,11 @@ ACC_LOW = port.C
 ACC_HIGH = port.F
 SNS_LEFT = port.D
 SNS_RIGHT = port.B
-WHEEL_DIAM = 624# millimeters*10
-WHEEL_CIRC = int(624 * math.pi)
+WHEEL_DIAM = 624 # millimeters*10
+WHEEL_CIRC = int(WHEEL_DIAM * math.pi)
 print("WHEEL_CIRC: ", WHEEL_CIRC)
 MAX_TURN_VELOCITY = 300
 MIN_TURN_VELOCITY = 50
-DO_SOIL = False
 
 ######### HARDWARE SETUP
 motor_pair.pair(PAIR_IDX, LEFT_MOTOR, RIGHT_MOTOR)
@@ -59,7 +58,6 @@ async def turn_to_angle(target_yaw: int, sleep_ms: int = 10):
             steering = -100
         elif error > 0:
             steering = 100
-
         v = abs(int(error / 2))
         if v > MAX_TURN_VELOCITY:
             v = MAX_TURN_VELOCITY
@@ -102,15 +100,37 @@ async def artbots():
     await light_matrix.write("ARTBOTS")
 
 async def boat():
-    await drive_straight(650, velocity=450)
-    await drive_straight(-650, velocity=450)
+    """
+    M12: 30 (20+10)
+    Flag: 10
+    LINE UP [RED]: 2 squares from right on inside line (right corner robot)
+    """
+    flag_turn = -350
+    await drive_straight(500, velocity=450, acceleration=500)
+    await motor.run_for_degrees(ACC_HIGH, flag_turn, 500)
+    await runloop.sleep_ms(100)
+    await drive_straight(-100)
+    await motor.run_for_degrees(ACC_LOW, -240, 500)
+    await drive_straight(-150, velocity=450)
+    motor.run_for_degrees(ACC_LOW, 240, 500)
+    motor.run_for_degrees(ACC_HIGH, -flag_turn, 500)
+    await drive_straight(-300, velocity=450)
+
+
 
 async def surface_brushing_map_reveal():
-    await drive_straight(754, velocity=600)
-    await turn_to_angle(-345)
+    """
+    M02: 30 (10 pt/obj)
+    M01: 30 (10 pt/obj + 10)
+
+
+    LINE UP [RED]: 11 squares from left (left corner robot)
+    """
+    await drive_straight(730, velocity=300, acceleration=500)
+    await turn_to_angle(-342)
     await runloop.sleep_ms(10)
-    await drive_straight(145, velocity=200)
-    await motor.run_for_degrees(ACC_HIGH, 300, 500)
+    await drive_straight(140, velocity=200)
+    await motor.run_for_degrees(ACC_HIGH, 300, 500) # M02 (Map Reveal)
     await drive_straight(-30, acceleration=1500)
     await drive_straight(-135)
     await turn_to_angle(-430)
@@ -125,59 +145,178 @@ async def surface_brushing_map_reveal():
     await turn_to_angle(-1300)
     await motor.run_for_degrees(ACC_HIGH, -400, 500)
 
-async def who_lived_and_forge():
-    # LINE UP: right corner robot 8 squares from left (1 square RIGHT from 2nd black mark on left) 
-    if True:
-        await drive_straight(705)
-        await turn_to_angle(450)
+async def cross_field():
+    motor.run_for_degrees(ACC_HIGH, -180, 250)
+    await drive_straight(870)
+    await turn_to_angle(900)
+    await motor.run_for_degrees(ACC_HIGH, 180, 250)
+    await drive_straight(160)
+    # We are now under the minecart
+    await motor.run_for_degrees(ACC_HIGH, -360, 250)
+    await motor.run_for_degrees(ACC_HIGH, 180, 250)
+    motor.run_for_degrees(ACC_HIGH, 180, 250)
+    await turn_to_angle(470)
+    await drive_straight(180)
+
+    # Lifting the statue
+    await motor.run_for_degrees(ACC_HIGH, -100, 100)
+    await turn_to_angle(-100)
+    await motor.run_for_degrees(ACC_HIGH, -300, 500)
+    await drive_straight(-100)
+    await turn_to_angle(-460)
+    await drive_straight(800)
+    await turn_to_angle(540)
+
+    #await motor.run_for_degrees(ACC_HIGH, 400, 1000)
+    #await motor.run_for_degrees(ACC_HIGH, -80, 250)
+    await drive_straight(500)
+
+
+
+
+
+async def cross_field2():
+    """
+    M03: 30
+    M04: 10 (passive)
+    M13: 30
+    M09: 20 (roof)
+
+
+    LINE UP [RED]: 9 squares from left (left corner robot)
+    """
+    await drive_straight(710,velocity=600)
+    await turn_to_angle(620)
+    await drive_straight(185)
+    await motor.run_for_degrees(ACC_HIGH, -360, 250) # raise arm to move M03 (Mineshaft Explorer)
+    #await runloop.sleep_ms(200)
+    await motor.run_for_degrees(ACC_HIGH, 180, 250) # lower arm
+    await turn_to_angle(280)
+    await drive_straight(50)
+    await turn_to_angle(400)
+    await motor.run_for_degrees(ACC_HIGH, 180, 250)
+    await drive_straight(80)
+
+    # setup for M13 (Statue)
+    if False:
+        await drive_straight(20)
+        await turn_to_angle(700) 
+        await drive_straight(105)
+        await turn_to_angle(60)
         await drive_straight(25)
-        color_check = True
-        while(color_check):
-            await drive_straight(5)
-            if color_sensor.color(SNS_LEFT) is color.WHITE and color_sensor.color(SNS_RIGHT) is color.WHITE:
-                color_check = False
-        # turn to dump rocks 
-        await turn_to_angle(-700, sleep_ms=200)
-        await drive_straight(30)
-        await turn_to_angle(-150) # flip who lived here
-        await drive_straight(-50)
-        await turn_to_angle(-500) # backup to move rocks
-        await drive_straight(-420)
-        await turn_to_angle(620) # set up to pick up millstone
-    await motor.run_for_degrees(ACC_LOW, -115, 500) # drop arm
+    #await turn_to_angle(-90)
+    await motor.run_for_degrees(ACC_HIGH, -230, 300) # lift statue
+    await runloop.sleep_ms(500)
+    #await turn_to_angle(-40)
+    await motor.run_for_degrees(ACC_HIGH, -150, 300) # continue to lift statue
+    await runloop.sleep_ms(200)
+    await motor.run_for_degrees(ACC_HIGH, -150, 300) # ensure arm raised enough to not obstruct
+
+    await drive_straight(-150)
+    await turn_to_angle(-450)
+    await drive_straight(600)
+    return
+
+    # setup to cross field
+    await turn_to_angle(-10)
+    await turn_to_angle(30)
+    await drive_straight(-60)
+    await turn_to_angle(-650)
+    await drive_straight(540,velocity=600)
+    await turn_to_angle(430)
+    await drive_straight(290)
+    await turn_to_angle(90)
+    await drive_straight(290,velocity=100) # bump M09 (What's On Sale?)
+    await drive_straight(-130)
+    await turn_to_angle(-175)
+    await drive_straight(800,velocity=1000) # drive to blue home area
+    return
+
+async def who_lived_and_forge():
+    """
+    M06: 30 (10 pt/rock)
+    M05: 30
+    M07: 30
+
+
+    LINE UP [BLUE]: 2 squares from left (left corner robot)
+    """
+    await drive_straight(705, velocity=600)
+    await turn_to_angle(450)
+    await drive_straight(30)
+    color_check = True
+    while(color_check):
+        await drive_straight(5)
+        if color_sensor.color(SNS_LEFT) is color.BLACK and color_sensor.color(SNS_RIGHT) is color.BLACK:
+            color_check = False
+    await drive_straight(-30)
+    await turn_to_angle(-700, sleep_ms=200) # dump rocks M06 (Forge)
+    await drive_straight(30)
+    await turn_to_angle(-140) # flip M05 (Who Lived Here?)
+    await drive_straight(-50)
+    await turn_to_angle(-510) # move rocks into home area
+    await drive_straight(-420,velocity= 750)
+    await turn_to_angle(640) # set up M07 (Heavy Lifting)
+    await motor.run_for_degrees(ACC_LOW, -135, 500) # drop armNEED TO DOUBLE CHECK
     await drive_straight(35)
     await turn_to_angle(-100)
-    await motor.run_for_degrees(ACC_LOW, 115, 100) # pick up millstone
+    await motor.run_for_degrees(ACC_LOW, 135, 100) # pick up millstone
     await turn_to_angle(100)
-    await drive_straight(-35)
-    await drive_straight(-520)
+    await drive_straight(-520, velocity= 750) # return home
     return
 
 async def tip_the_scales():
-    await drive_straight(775)
+    """
+    M10: 30
+
+
+    LINE UP [BLUE]: 9 squares from left on launch/home border (left corner robot)
+    """
+    await drive_straight(700, velocity= 1000)
     await turn_to_angle(-900)
-    await drive_straight(-200)
-    await drive_straight(200)
+    await drive_straight(-150) # tip scale
+    await drive_straight(150) # remove pan
     await turn_to_angle(-700)
-    await drive_straight(670, velocity=1000)
-    await turn_to_angle(125)
-    await runloop.sleep_ms(2000)
-    await drive_straight(-1250, velocity=1000)
-    await drive_straight(100, acceleration=1500)
-    pass
+    await drive_straight(650, velocity=1000) # return home
+    return
+
+async def forum():
+    """
+    M14: 25 (5 pt/obj)
+
+
+    LINE UP [BLUE]: 3 black lines from left (left corner robot), 2 black lines on arc (right cage wall)
+    """
+    await drive_straight(-1075, velocity= 800)
+    await drive_straight(200, velocity= 1500) # backup to not touch artifacts
+    return
 
 ##### RUN LIST
 # keeps a list of run name and run function
+"""
+Point totals:    405
+Inspection:20
+Precision:    50
+Run 1:        60
+Run 2:        40
+Run 3:        90
+Run 4:        90
+Run 5:        30
+Run 6:        25
+"""
 runs = [
-    ("3", who_lived_and_forge),
+    ("2", boat),
+
 
     #("0", artbots),
     # From the RED SIDE
     ("1", surface_brushing_map_reveal),
     ("2", boat),
+    ("3", cross_field),
     # From the BLUE SIDE
-    # ("3", who_lived_and_forge),
-    #("4", tip_the_scales)
+    ("4", who_lived_and_forge),
+    ("5", tip_the_scales),
+    ("6", forum),
 ]
 
 ###### MAIN FUNCTION
