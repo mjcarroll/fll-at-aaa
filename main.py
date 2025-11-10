@@ -13,6 +13,9 @@ from hub import light_matrix
 from hub import motion_sensor
 from hub import port
 
+from app import linegraph
+
+
 ######### CONSTANTS
 PAIR_IDX = 0
 LEFT_MOTOR = port.A
@@ -68,6 +71,62 @@ async def turn_to_angle(target_yaw: int, sleep_ms: int = 10):
     motor_pair.stop(PAIR_IDX)
     await runloop.sleep_ms(sleep_ms)
 
+def sum_wheels(curTime) -> int:
+    L = abs(motor.relative_position(LEFT_MOTOR))
+    R = abs(motor.relative_position(RIGHT_MOTOR))
+    #linegraph.plot(color.YELLOW, curTime, L)
+    #linegraph.plot(color.TURQUOISE, curTime, R)
+    return int((L + R) / 2)
+
+async def gyro_drive_straight(
+    target_distance: int,
+    velocity: int = 500,
+    dt: int = 2,
+):
+    degrees_to_move = int((3600 * target_distance) / WHEEL_CIRC)
+    print("drive straight: ", target_distance, degrees_to_move)
+    motor.reset_relative_position(LEFT_MOTOR, 0); motor.reset_relative_position(RIGHT_MOTOR, 0)
+
+    error = 0
+    integrator = 0
+    windup = 100
+    kp = 0.1
+    ki = 5
+
+    linegraph.clear_all()
+    curTime = 0
+    sumPos = sum_wheels(curTime)
+    motion_sensor.reset_yaw(0)
+
+    # Heading is more positive on left turn
+    # Heading is more negative on right turn
+
+    while sumPos < degrees_to_move:
+        curTime = curTime + dt
+        curHeading = motion_sensor.tilt_angles()[0]
+
+        error = -curHeading
+        integrator = integrator + (error * dt)/1000
+
+        if (integrator > windup): integrator = windup
+        if (integrator < -windup): integrator = -windup
+
+        correction = kp * error + ki * integrator
+
+        #linegraph.plot(color.BLACK, curTime, curHeading)
+        linegraph.plot(color.BLUE, curTime, error)
+        linegraph.plot(color.GREEN, curTime, integrator)
+
+        linegraph.plot(color.RED, curTime, kp*error)
+        linegraph.plot(color.MAGENTA, curTime, ki*integrator)
+
+        motor_pair.move_tank(PAIR_IDX,
+            velocity - int(velocity * correction / 100),
+            velocity + int(velocity * correction / 100)
+        )
+        await runloop.sleep_ms(dt)
+        sumPos = sum_wheels(curTime)
+    motor_pair.stop(PAIR_IDX)
 
 async def drive_straight(
     target_distance: int,
@@ -106,7 +165,22 @@ async def boat():
     LINE UP [RED]: 2 squares from right on inside line (right corner robot)
     """
     flag_turn = -350
-    await drive_straight(500, velocity=450, acceleration=500)
+    await gyro_drive_straight(610, velocity=600)
+
+    motor_pair.move(PAIR_IDX, 100, velocity=300)
+    await runloop.sleep_ms(100)
+
+    motor_pair.stop(PAIR_IDX)
+    
+    await motor.run_for_degrees(ACC_HIGH, flag_turn, 500)
+    motor.run_for_degrees(ACC_HIGH, -flag_turn, 500)
+    motor.run_for_degrees(ACC_LOW, -300, 500)
+    await drive_straight(-150, velocity=450)
+    motor.run_for_degrees(ACC_LOW, 300, 500)
+    await drive_straight(-500, velocity=1000)
+
+
+    return
     await motor.run_for_degrees(ACC_HIGH, flag_turn, 500)
     await runloop.sleep_ms(100)
     await drive_straight(-100)
@@ -114,8 +188,7 @@ async def boat():
     await drive_straight(-150, velocity=450)
     motor.run_for_degrees(ACC_LOW, 240, 500)
     motor.run_for_degrees(ACC_HIGH, -flag_turn, 500)
-    await drive_straight(-300, velocity=450)
-
+    await drive_straight(-300, velocity=1000)
 
 
 async def surface_brushing_map_reveal():
@@ -124,10 +197,22 @@ async def surface_brushing_map_reveal():
     M01: 30 (10 pt/obj + 10)
 
 
-    LINE UP [RED]: 11 squares from left (left corner robot)
+    LINE UP [RED]: 10 squares from left (left corner robot)
     """
-    await drive_straight(730, velocity=300, acceleration=500)
-    await turn_to_angle(-342)
+    await gyro_drive_straight(675, velocity=500)
+    await runloop.sleep_ms(100)
+    await turn_to_angle(-420)
+    await gyro_drive_straight(140, velocity=300)
+    await runloop.sleep_ms(10)
+    await motor.run_for_degrees(ACC_HIGH, 300, 500) # M02 (Map Reveal)
+    await drive_straight(-140)
+    await turn_to_angle(480)
+    await drive_straight(-710, velocity=1000)
+
+
+
+
+    return 
     await runloop.sleep_ms(10)
     await drive_straight(140, velocity=200)
     await motor.run_for_degrees(ACC_HIGH, 300, 500) # M02 (Map Reveal)
@@ -146,33 +231,39 @@ async def surface_brushing_map_reveal():
     await motor.run_for_degrees(ACC_HIGH, -400, 500)
 
 async def cross_field():
-    motor.run_for_degrees(ACC_HIGH, -180, 250)
-    await drive_straight(870)
-    await turn_to_angle(900)
-    await motor.run_for_degrees(ACC_HIGH, 180, 250)
-    await drive_straight(160)
-    # We are now under the minecart
-    await motor.run_for_degrees(ACC_HIGH, -360, 250)
-    await motor.run_for_degrees(ACC_HIGH, 180, 250)
     motor.run_for_degrees(ACC_HIGH, 180, 250)
-    await turn_to_angle(470)
+    await gyro_drive_straight(820)
+    await runloop.sleep_ms(50)
+    await turn_to_angle(900)
+    await motor.run_for_degrees(ACC_HIGH, -180, 250)
     await drive_straight(180)
+    # We are now under the minecart
+    await motor.run_for_degrees(ACC_HIGH, 360, 250)
+    await motor.run_for_degrees(ACC_HIGH, -180, 250)
+    motor.run_for_degrees(ACC_HIGH, -180, 250)
+    await turn_to_angle(490)
+    await drive_straight(200)
 
     # Lifting the statue
-    await motor.run_for_degrees(ACC_HIGH, -100, 100)
+    await motor.run_for_degrees(ACC_HIGH, 100, 100)
     await turn_to_angle(-100)
-    await motor.run_for_degrees(ACC_HIGH, -300, 500)
+    await motor.run_for_degrees(ACC_HIGH, 300, 500)
     await drive_straight(-100)
     await turn_to_angle(-460)
-    await drive_straight(800)
-    await turn_to_angle(540)
+
+
+    await gyro_drive_straight(670)
+    await runloop.sleep_ms(50)
+    await turn_to_angle(450)
 
     #await motor.run_for_degrees(ACC_HIGH, 400, 1000)
     #await motor.run_for_degrees(ACC_HIGH, -80, 250)
-    await drive_straight(500)
-
-
-
+    await drive_straight(150, velocity=250)
+    await drive_straight(-150, velocity=500)
+    await turn_to_angle(-450)
+    await drive_straight(300, velocity=1000)
+    await turn_to_angle(450)
+    await drive_straight(800, velocity=1000)
 
 
 async def cross_field2():
@@ -181,8 +272,6 @@ async def cross_field2():
     M04: 10 (passive)
     M13: 30
     M09: 20 (roof)
-
-
     LINE UP [RED]: 9 squares from left (left corner robot)
     """
     await drive_straight(710,velocity=600)
@@ -200,7 +289,7 @@ async def cross_field2():
     # setup for M13 (Statue)
     if False:
         await drive_straight(20)
-        await turn_to_angle(700) 
+        await turn_to_angle(700)
         await drive_straight(105)
         await turn_to_angle(60)
         await drive_straight(25)
@@ -241,7 +330,8 @@ async def who_lived_and_forge():
 
     LINE UP [BLUE]: 2 squares from left (left corner robot)
     """
-    await drive_straight(705, velocity=600)
+    await gyro_drive_straight(630, velocity=600)
+    await runloop.sleep_ms(100)
     await turn_to_angle(450)
     await drive_straight(30)
     color_check = True
@@ -251,18 +341,18 @@ async def who_lived_and_forge():
             color_check = False
     await drive_straight(-30)
     await turn_to_angle(-700, sleep_ms=200) # dump rocks M06 (Forge)
-    await drive_straight(30)
+    await drive_straight(50)
     await turn_to_angle(-140) # flip M05 (Who Lived Here?)
-    await drive_straight(-50)
-    await turn_to_angle(-510) # move rocks into home area
-    await drive_straight(-420,velocity= 750)
+    await drive_straight(-90)
+    await turn_to_angle(-500) # move rocks into home area
+    await drive_straight(-420, velocity= 750)
     await turn_to_angle(640) # set up M07 (Heavy Lifting)
     await motor.run_for_degrees(ACC_LOW, -135, 500) # drop armNEED TO DOUBLE CHECK
-    await drive_straight(35)
+    await drive_straight(25)
     await turn_to_angle(-100)
     await motor.run_for_degrees(ACC_LOW, 135, 100) # pick up millstone
     await turn_to_angle(100)
-    await drive_straight(-520, velocity= 750) # return home
+    await drive_straight(-1000, velocity= 1000) # return home
     return
 
 async def tip_the_scales():
@@ -305,9 +395,6 @@ Run 5:        30
 Run 6:        25
 """
 runs = [
-    ("2", boat),
-
-
     #("0", artbots),
     # From the RED SIDE
     ("1", surface_brushing_map_reveal),
