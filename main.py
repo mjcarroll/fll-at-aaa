@@ -194,6 +194,7 @@ async def gyro_drive_straight(
     velocity: int = 500
 ):
     await gds.run(target_distance, velocity)
+    await runloop.sleep_ms(10)
 
 
 async def drive_straight(
@@ -349,16 +350,16 @@ async def who_lived_and_forge():
 async def tip_the_scales():
     """
     M10: 30
-
-
     LINE UP [BLUE]: 9 squares from left on launch/home border (left corner robot)
     """
-    await drive_straight(700, velocity= 1000)
+    await gyro_drive_straight(-190)
+    await turn_to_angle(900)
+    await gyro_drive_straight(600)
     await turn_to_angle(-900)
     await drive_straight(-150) # tip scale
     await drive_straight(150) # remove pan
     await turn_to_angle(-700)
-    await drive_straight(650, velocity=1000) # return home
+    await drive_straight(800, velocity=1000) # return home
     return
 
 async def forum():
