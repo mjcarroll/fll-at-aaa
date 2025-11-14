@@ -287,9 +287,9 @@ async def cross_field():
     await motor.run_for_degrees(ACC_HIGH, -180, 250)
     await drive_straight(180)
     # We are now under the minecart
-    await motor.run_for_degrees(ACC_HIGH, 360, 250)
-    await motor.run_for_degrees(ACC_HIGH, -180, 250)
-    motor.run_for_degrees(ACC_HIGH, -180, 250)
+    await motor.run_for_degrees(ACC_HIGH, 400, 250)
+    await motor.run_for_degrees(ACC_HIGH, -200, 250)
+    motor.run_for_degrees(ACC_HIGH, -200, 250)
     await turn_to_angle(490)
     await drive_straight(200)
 
@@ -331,18 +331,19 @@ async def who_lived_and_forge():
         await drive_straight(5)
         if color_sensor.color(SNS_LEFT) is color.BLACK and color_sensor.color(SNS_RIGHT) is color.BLACK:
             color_check = False
-    await drive_straight(-30)
+    await drive_straight(-20)
     await turn_to_angle(-700, sleep_ms=200) # dump rocks M06 (Forge)
     await drive_straight(50)
-    await turn_to_angle(-140) # flip M05 (Who Lived Here?)
-    await drive_straight(-80)
-    await turn_to_angle(-500) # move rocks into home area
-    await drive_straight(-420)
+    await turn_to_angle(-170) # flip M05 (Who Lived Here?)
+    await drive_straight(-50)
+    await turn_to_angle(-470) # move rocks into home area
+    await drive_straight(-410)
     await turn_to_angle(640) # set up M07 (Heavy Lifting)
-    await motor.run_for_degrees(ACC_LOW, -135, 500) # drop armNEED TO DOUBLE CHECK
-    await drive_straight(25)
+    await motor.run_for_degrees(ACC_LOW, -125, 500) # drop armNEED TO DOUBLE CHECK
+    await drive_straight(30)
     await turn_to_angle(-100)
-    await motor.run_for_degrees(ACC_LOW, 135, 100) # pick up millstone
+    await motor.run_for_degrees(ACC_LOW, 125, 100) # pick up millstone
+
     await turn_to_angle(100)
     await drive_straight(-1000, velocity= 1000) # return home
     return
@@ -369,8 +370,8 @@ async def forum():
 
     LINE UP [BLUE]: 3 black lines from left (left corner robot), 2 black lines on arc (right cage wall)
     """
-    await drive_straight(-1075, velocity= 800)
-    await drive_straight(200, velocity= 1500) # backup to not touch artifacts
+    await gyro_drive_straight(-1075, velocity= 700)
+    await gyro_drive_straight(200, velocity= 1500) # backup to not touch artifacts
     return
 
 ##### RUN LIST
