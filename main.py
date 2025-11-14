@@ -1,11 +1,8 @@
 ######### IMPORTS
-import math
+import color
 import color_sensor
-import runloop
 import motor
 import motor_pair
-
-import color
 
 from hub import button
 from hub import light
@@ -13,8 +10,9 @@ from hub import light_matrix
 from hub import motion_sensor
 from hub import port
 
-from app import linegraph
-
+import math
+import runloop
+import time
 
 ######### CONSTANTS
 PAIR_IDX = 0
@@ -29,9 +27,127 @@ WHEEL_CIRC = int(WHEEL_DIAM * math.pi)
 print("WHEEL_CIRC: ", WHEEL_CIRC)
 MAX_TURN_VELOCITY = 300
 MIN_TURN_VELOCITY = 50
-
-######### HARDWARE SETUP
 motor_pair.pair(PAIR_IDX, LEFT_MOTOR, RIGHT_MOTOR)
+
+######### HELPERS
+async def run_rate(func, rate_ms: int):
+    """
+    Run a function at a fixed rate
+    """
+    rate_us = rate_ms * 1000
+    next_run_time_us: int = time.ticks_us()
+    last_run_time_us: int = next_run_time_us
+    while True:
+        # 1. Get the current time in microseconds
+        current_time_us: int = time.ticks_us()
+
+        # 2. Calculate how long to sleep in microseconds
+        #    We check the difference between our target 'next_run_time_us'
+        #    and the 'current_time_us'.
+        sleep_time_us: int = time.ticks_diff(next_run_time_us, current_time_us)
+
+        # 3. Convert sleep time to milliseconds for the sleep function.
+        #    We must sleep in 'ms', so we get the 'floor' value.
+        sleep_time_ms: int = sleep_time_us // 1000
+
+        # 4. If we are not behind schedule (sleep_time_ms > 0),
+        #    then sleep for that precise calculated amount.
+        #    If sleep_time_ms is 0 or negative, we're running late,
+        #    so we skip sleeping and run the loop immediately.
+        if sleep_time_ms > 0:
+            await runloop.sleep_ms(sleep_time_ms)
+
+        # 5. Set the *next* run time, 'rate_us' from the *previous*
+        #    target. This is key: we add to 'next_run_time_us',
+        #    not the 'current_time_us'. This ensures the loop
+        #    averages the target rate even if one loop is slightly delayed.
+        next_run_time_us = time.ticks_add(next_run_time_us, rate_us)
+
+        # --- Call the provided function ---
+        # Assumes 'func' is a synchronous function
+        current_run_time_us: int = time.ticks_us()
+        delta_time_us: int = time.ticks_diff(current_run_time_us, last_run_time_us)
+        last_run_time_us = current_run_time_us
+        ret = func(int(current_run_time_us / 1000), int(delta_time_us / 1000))
+        if not ret:
+            break
+
+class GyroDriveStraight:
+    # Error times milliseconds, normalize before use
+    error_accum: int
+    prev_error: int
+    setpoint: int
+
+    windup:int = 1000
+    Kp: float = 0.3
+    Ki: float = 0.5
+    Kd: float = 0.0
+
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        self.error_accum = 0
+        self.prev_error = 0
+        self.setpoint = 0
+        self.reverse = False
+        motor.reset_relative_position(LEFT_MOTOR, 0)
+        motor.reset_relative_position(RIGHT_MOTOR, 0)
+        motion_sensor.reset_yaw(0)
+
+    def distance_travelled(self) -> int:
+        L = abs(motor.relative_position(LEFT_MOTOR))
+        R = abs(motor.relative_position(RIGHT_MOTOR))
+        return int((L + R) / 2)
+
+    def _error_sum(self):
+        if self.error_accum > self.windup:
+            self.error_accum = self.windup
+        elif self.error_accum < -self.windup:
+            self.error_accum = -self.windup
+        return self.error_accum / 1000
+
+    def _update(self, z: int, dt: int):
+        print("_update", z, dt)
+        error = self.setpoint - z
+        self.error_accum = self.error_accum + error * dt
+        if dt > 0:
+            d_error = (error - self.prev_error) / dt
+        else:
+            d_error = 0
+        output = self.Kp * error + self.Ki * self._error_sum() + self.Kd * d_error
+        self.prev_error = error
+        print("Corr: ", self.Kp * error, self.Ki * self._error_sum(), self.Kd * d_error, output)
+        return output
+
+    def _tick(self, t, dt):
+        if abs(self.distance_travelled()) > abs(self.degrees_to_move):
+            print("drive straight (done): ", self.distance_travelled())
+            return False
+        curHeading = motion_sensor.tilt_angles()[0]
+        if self.reverse:
+            curHeading = -curHeading
+        correction = self._update(curHeading, dt)
+        print(self.velocity - int(self.velocity * correction / 100), self.velocity + int(self.velocity * correction / 100))
+        motor_pair.move_tank(PAIR_IDX,
+            self.velocity - int(self.velocity * correction / 100),
+            self.velocity + int(self.velocity * correction / 100)
+        )
+        return True
+
+    async def run(self, distance: int, velocity: int, dt: int = 25):
+        self.reset()
+        self.degrees_to_move = int((3600 * distance) / WHEEL_CIRC)
+        self.velocity = velocity
+
+        if self.degrees_to_move < 0:
+            self.reverse = True
+            self.velocity = -self.velocity
+        self.dt = dt
+        print("drive straight: ", distance, self.degrees_to_move, self.velocity, self.dt)
+        await run_rate(self._tick, 25)
+        motor_pair.stop(PAIR_IDX)
+
 
 ######### COMMON FUNCTIONS
 async def turn_to_angle(target_yaw: int, sleep_ms: int = 10):
@@ -71,62 +187,14 @@ async def turn_to_angle(target_yaw: int, sleep_ms: int = 10):
     motor_pair.stop(PAIR_IDX)
     await runloop.sleep_ms(sleep_ms)
 
-def sum_wheels(curTime) -> int:
-    L = abs(motor.relative_position(LEFT_MOTOR))
-    R = abs(motor.relative_position(RIGHT_MOTOR))
-    #linegraph.plot(color.YELLOW, curTime, L)
-    #linegraph.plot(color.TURQUOISE, curTime, R)
-    return int((L + R) / 2)
 
+gds = GyroDriveStraight()
 async def gyro_drive_straight(
     target_distance: int,
-    velocity: int = 500,
-    dt: int = 2,
+    velocity: int = 500
 ):
-    degrees_to_move = int((3600 * target_distance) / WHEEL_CIRC)
-    print("drive straight: ", target_distance, degrees_to_move)
-    motor.reset_relative_position(LEFT_MOTOR, 0); motor.reset_relative_position(RIGHT_MOTOR, 0)
+    await gds.run(target_distance, velocity)
 
-    error = 0
-    integrator = 0
-    windup = 100
-    kp = 0.1
-    ki = 5
-
-    linegraph.clear_all()
-    curTime = 0
-    sumPos = sum_wheels(curTime)
-    motion_sensor.reset_yaw(0)
-
-    # Heading is more positive on left turn
-    # Heading is more negative on right turn
-
-    while sumPos < degrees_to_move:
-        curTime = curTime + dt
-        curHeading = motion_sensor.tilt_angles()[0]
-
-        error = -curHeading
-        integrator = integrator + (error * dt)/1000
-
-        if (integrator > windup): integrator = windup
-        if (integrator < -windup): integrator = -windup
-
-        correction = kp * error + ki * integrator
-
-        #linegraph.plot(color.BLACK, curTime, curHeading)
-        linegraph.plot(color.BLUE, curTime, error)
-        linegraph.plot(color.GREEN, curTime, integrator)
-
-        linegraph.plot(color.RED, curTime, kp*error)
-        linegraph.plot(color.MAGENTA, curTime, ki*integrator)
-
-        motor_pair.move_tank(PAIR_IDX,
-            velocity - int(velocity * correction / 100),
-            velocity + int(velocity * correction / 100)
-        )
-        await runloop.sleep_ms(dt)
-        sumPos = sum_wheels(curTime)
-    motor_pair.stop(PAIR_IDX)
 
 async def drive_straight(
     target_distance: int,
@@ -208,27 +276,7 @@ async def surface_brushing_map_reveal():
     await drive_straight(-140)
     await turn_to_angle(480)
     await drive_straight(-710, velocity=1000)
-
-
-
-
     return 
-    await runloop.sleep_ms(10)
-    await drive_straight(140, velocity=200)
-    await motor.run_for_degrees(ACC_HIGH, 300, 500) # M02 (Map Reveal)
-    await drive_straight(-30, acceleration=1500)
-    await drive_straight(-135)
-    await turn_to_angle(-430)
-    await drive_straight(120)
-    await motor.run_for_degrees(ACC_LOW, 750, 500)
-    await motor.run_for_degrees(ACC_LOW, -750, 500)
-    await drive_straight(-100)
-    await motor.run_for_degrees(ACC_HIGH, -550, 500)
-    await drive_straight(40)
-    await motor.run_for_degrees(ACC_HIGH, 500, 500)
-    await drive_straight(-200)
-    await turn_to_angle(-1300)
-    await motor.run_for_degrees(ACC_HIGH, -400, 500)
 
 async def cross_field():
     motor.run_for_degrees(ACC_HIGH, 180, 250)
@@ -251,7 +299,6 @@ async def cross_field():
     await drive_straight(-100)
     await turn_to_angle(-460)
 
-
     await gyro_drive_straight(670)
     await runloop.sleep_ms(50)
     await turn_to_angle(450)
@@ -265,62 +312,6 @@ async def cross_field():
     await turn_to_angle(450)
     await drive_straight(800, velocity=1000)
 
-
-async def cross_field2():
-    """
-    M03: 30
-    M04: 10 (passive)
-    M13: 30
-    M09: 20 (roof)
-    LINE UP [RED]: 9 squares from left (left corner robot)
-    """
-    await drive_straight(710,velocity=600)
-    await turn_to_angle(620)
-    await drive_straight(185)
-    await motor.run_for_degrees(ACC_HIGH, -360, 250) # raise arm to move M03 (Mineshaft Explorer)
-    #await runloop.sleep_ms(200)
-    await motor.run_for_degrees(ACC_HIGH, 180, 250) # lower arm
-    await turn_to_angle(280)
-    await drive_straight(50)
-    await turn_to_angle(400)
-    await motor.run_for_degrees(ACC_HIGH, 180, 250)
-    await drive_straight(80)
-
-    # setup for M13 (Statue)
-    if False:
-        await drive_straight(20)
-        await turn_to_angle(700)
-        await drive_straight(105)
-        await turn_to_angle(60)
-        await drive_straight(25)
-    #await turn_to_angle(-90)
-    await motor.run_for_degrees(ACC_HIGH, -230, 300) # lift statue
-    await runloop.sleep_ms(500)
-    #await turn_to_angle(-40)
-    await motor.run_for_degrees(ACC_HIGH, -150, 300) # continue to lift statue
-    await runloop.sleep_ms(200)
-    await motor.run_for_degrees(ACC_HIGH, -150, 300) # ensure arm raised enough to not obstruct
-
-    await drive_straight(-150)
-    await turn_to_angle(-450)
-    await drive_straight(600)
-    return
-
-    # setup to cross field
-    await turn_to_angle(-10)
-    await turn_to_angle(30)
-    await drive_straight(-60)
-    await turn_to_angle(-650)
-    await drive_straight(540,velocity=600)
-    await turn_to_angle(430)
-    await drive_straight(290)
-    await turn_to_angle(90)
-    await drive_straight(290,velocity=100) # bump M09 (What's On Sale?)
-    await drive_straight(-130)
-    await turn_to_angle(-175)
-    await drive_straight(800,velocity=1000) # drive to blue home area
-    return
-
 async def who_lived_and_forge():
     """
     M06: 30 (10 pt/rock)
@@ -330,7 +321,7 @@ async def who_lived_and_forge():
 
     LINE UP [BLUE]: 2 squares from left (left corner robot)
     """
-    await gyro_drive_straight(630, velocity=600)
+    await gyro_drive_straight(660, velocity=600)
     await runloop.sleep_ms(100)
     await turn_to_angle(450)
     await drive_straight(30)
@@ -343,9 +334,9 @@ async def who_lived_and_forge():
     await turn_to_angle(-700, sleep_ms=200) # dump rocks M06 (Forge)
     await drive_straight(50)
     await turn_to_angle(-140) # flip M05 (Who Lived Here?)
-    await drive_straight(-90)
+    await drive_straight(-80)
     await turn_to_angle(-500) # move rocks into home area
-    await drive_straight(-420, velocity= 750)
+    await drive_straight(-420)
     await turn_to_angle(640) # set up M07 (Heavy Lifting)
     await motor.run_for_degrees(ACC_LOW, -135, 500) # drop armNEED TO DOUBLE CHECK
     await drive_straight(25)
@@ -397,8 +388,8 @@ Run 6:        25
 runs = [
     #("0", artbots),
     # From the RED SIDE
-    ("1", surface_brushing_map_reveal),
-    ("2", boat),
+    ("1", boat),
+    ("2", surface_brushing_map_reveal),
     ("3", cross_field),
     # From the BLUE SIDE
     ("4", who_lived_and_forge),
