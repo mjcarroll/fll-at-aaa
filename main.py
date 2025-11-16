@@ -24,7 +24,7 @@ SNS_LEFT = port.D
 SNS_RIGHT = port.B
 WHEEL_DIAM = 624 # millimeters*10
 WHEEL_CIRC = int(WHEEL_DIAM * math.pi)
-print("WHEEL_CIRC: ", WHEEL_CIRC)
+#print("WHEEL_CIRC: ", WHEEL_CIRC)
 MAX_TURN_VELOCITY = 300
 MIN_TURN_VELOCITY = 50
 motor_pair.pair(PAIR_IDX, LEFT_MOTOR, RIGHT_MOTOR)
@@ -108,7 +108,7 @@ class GyroDriveStraight:
         return self.error_accum / 1000
 
     def _update(self, z: int, dt: int):
-        print("_update", z, dt)
+        #print("_update", z, dt)
         error = self.setpoint - z
         self.error_accum = self.error_accum + error * dt
         if dt > 0:
@@ -117,18 +117,18 @@ class GyroDriveStraight:
             d_error = 0
         output = self.Kp * error + self.Ki * self._error_sum() + self.Kd * d_error
         self.prev_error = error
-        print("Corr: ", self.Kp * error, self.Ki * self._error_sum(), self.Kd * d_error, output)
+        #print("Corr: ", self.Kp * error, self.Ki * self._error_sum(), self.Kd * d_error, output)
         return output
 
     def _tick(self, t, dt):
         if abs(self.distance_travelled()) > abs(self.degrees_to_move):
-            print("drive straight (done): ", self.distance_travelled())
+            #print("drive straight (done): ", self.distance_travelled())
             return False
         curHeading = motion_sensor.tilt_angles()[0]
         if self.reverse:
             curHeading = -curHeading
         correction = self._update(curHeading, dt)
-        print(self.velocity - int(self.velocity * correction / 100), self.velocity + int(self.velocity * correction / 100))
+        #print(self.velocity - int(self.velocity * correction / 100), self.velocity + int(self.velocity * correction / 100))
         motor_pair.move_tank(PAIR_IDX,
             self.velocity - int(self.velocity * correction / 100),
             self.velocity + int(self.velocity * correction / 100)
@@ -144,7 +144,7 @@ class GyroDriveStraight:
             self.reverse = True
             self.velocity = -self.velocity
         self.dt = dt
-        print("drive straight: ", distance, self.degrees_to_move, self.velocity, self.dt)
+        #print("drive straight: ", distance, self.degrees_to_move, self.velocity, self.dt)
         await run_rate(self._tick, 25)
         motor_pair.stop(PAIR_IDX)
 
@@ -160,7 +160,7 @@ async def turn_to_angle(target_yaw: int, sleep_ms: int = 10):
     target_yaw = -target_yaw
     motion_sensor.reset_yaw(0)
     error = target_yaw
-    print("turn to angle: ", target_yaw)
+    #print("turn to angle: ", target_yaw)
 
     while True:
         current_yaw = motion_sensor.tilt_angles()[0]
@@ -233,19 +233,20 @@ async def boat():
     Flag: 10
     LINE UP [RED]: 2 squares from right on inside line (right corner robot)
     """
-    flag_turn = -350
+    flag_turn = -400
     await gyro_drive_straight(610, velocity=600)
 
     motor_pair.move(PAIR_IDX, 100, velocity=300)
     await runloop.sleep_ms(100)
-
     motor_pair.stop(PAIR_IDX)
-    
+
     await motor.run_for_degrees(ACC_HIGH, flag_turn, 500)
     motor.run_for_degrees(ACC_HIGH, -flag_turn, 500)
-    motor.run_for_degrees(ACC_LOW, -300, 500)
-    await drive_straight(-150, velocity=450)
-    motor.run_for_degrees(ACC_LOW, 300, 500)
+    await drive_straight(-50, velocity=450)
+    await motor.run_for_degrees(ACC_LOW, -350, 500)
+
+    await drive_straight(-200, velocity=450)
+    await motor.run_for_degrees(ACC_LOW, 350, 500)
     await drive_straight(-500, velocity=1000)
 
 
@@ -264,20 +265,46 @@ async def surface_brushing_map_reveal():
     """
     M02: 30 (10 pt/obj)
     M01: 30 (10 pt/obj + 10)
-
-
     LINE UP [RED]: 10 squares from left (left corner robot)
     """
-    await gyro_drive_straight(675, velocity=500)
+
+    await gyro_drive_straight(720, velocity=500)
     await runloop.sleep_ms(100)
-    await turn_to_angle(-420)
+
+    await turn_to_angle(-430)
+
+    await motor.run_for_degrees(ACC_LOW, 500, 400)
+    await motor.run_for_degrees(ACC_HIGH, -60, 500)
     await gyro_drive_straight(140, velocity=300)
-    await runloop.sleep_ms(10)
+    await runloop.sleep_ms(100)
+    await motor.run_for_degrees(ACC_HIGH, 500, 500) # M02 (Map Reveal)
+    await drive_straight(-140)
+    await turn_to_angle(430)
+    motor.run_for_degrees(ACC_LOW, -500, 400)
+    await drive_straight(-150)
+    await turn_to_angle(-800)
+    await drive_straight(100)
+    await motor.run_for_degrees(ACC_LOW, 500, 400)
+    await motor.run_for_degrees(ACC_LOW, -500, 400)
+    await drive_straight(-20)
+    await turn_to_angle(-600)
+    await drive_straight(700)
+
+    return
+    await turn_to_angle(450)
+    await drive_straight(-200)
+    await turn_to_angle(-900)
+    await motor.run_for_degrees(ACC_LOW, 500, 400)
+    await motor.run_for_degrees(ACC_LOW, -500, 400)
+
+
+
+    return
     await motor.run_for_degrees(ACC_HIGH, 300, 500) # M02 (Map Reveal)
     await drive_straight(-140)
     await turn_to_angle(480)
     await drive_straight(-710, velocity=1000)
-    return 
+    return
 
 async def cross_field():
     motor.run_for_degrees(ACC_HIGH, 180, 250)
@@ -295,22 +322,20 @@ async def cross_field():
 
     # Lifting the statue
     await motor.run_for_degrees(ACC_HIGH, 100, 100)
-    await turn_to_angle(-100)
+    await turn_to_angle(-50)
     await motor.run_for_degrees(ACC_HIGH, 300, 500)
-    await drive_straight(-100)
+    await drive_straight(-160)
     await turn_to_angle(-460)
 
-    await gyro_drive_straight(670)
+    await gyro_drive_straight(720)
     await runloop.sleep_ms(50)
     await turn_to_angle(450)
 
-    #await motor.run_for_degrees(ACC_HIGH, 400, 1000)
-    #await motor.run_for_degrees(ACC_HIGH, -80, 250)
-    await drive_straight(150, velocity=250)
-    await drive_straight(-150, velocity=500)
+    await drive_straight(200, velocity=250)
+    await drive_straight(-200, velocity=500)
     await turn_to_angle(-450)
     await drive_straight(300, velocity=1000)
-    await turn_to_angle(450)
+    await turn_to_angle(500)
     await drive_straight(800, velocity=1000)
 
 async def who_lived_and_forge():
@@ -325,13 +350,7 @@ async def who_lived_and_forge():
     await gyro_drive_straight(660, velocity=600)
     await runloop.sleep_ms(100)
     await turn_to_angle(450)
-    await drive_straight(30)
-    color_check = True
-    while(color_check):
-        await drive_straight(5)
-        if color_sensor.color(SNS_LEFT) is color.BLACK and color_sensor.color(SNS_RIGHT) is color.BLACK:
-            color_check = False
-    await drive_straight(-20)
+    await drive_straight(35)
     await turn_to_angle(-700, sleep_ms=200) # dump rocks M06 (Forge)
     await drive_straight(50)
     await turn_to_angle(-170) # flip M05 (Who Lived Here?)
@@ -339,13 +358,16 @@ async def who_lived_and_forge():
     await turn_to_angle(-470) # move rocks into home area
     await drive_straight(-410)
     await turn_to_angle(640) # set up M07 (Heavy Lifting)
-    await motor.run_for_degrees(ACC_LOW, -125, 500) # drop armNEED TO DOUBLE CHECK
+    await motor.run_for_degrees(ACC_LOW, -120, 500) # drop armNEED TO DOUBLE CHECK
     await drive_straight(30)
     await turn_to_angle(-100)
-    await motor.run_for_degrees(ACC_LOW, 125, 100) # pick up millstone
+    await motor.run_for_degrees(ACC_LOW, 120, 100) # pick up millstone
 
-    await turn_to_angle(100)
-    await drive_straight(-1000, velocity= 1000) # return home
+    await turn_to_angle(200)
+    await drive_straight(-100, velocity=500) # return home
+    await turn_to_angle(200)
+    #await drive_straight(-500, velocity=500)
+
     return
 
 async def tip_the_scales():
@@ -353,12 +375,12 @@ async def tip_the_scales():
     M10: 30
     LINE UP [BLUE]: 9 squares from left on launch/home border (left corner robot)
     """
-    await gyro_drive_straight(-190)
+    await gyro_drive_straight(-140)
     await turn_to_angle(900)
     await gyro_drive_straight(600)
     await turn_to_angle(-900)
-    await drive_straight(-150) # tip scale
-    await drive_straight(150) # remove pan
+    await drive_straight(-180) # tip scale
+    await drive_straight(180) # remove pan
     await turn_to_angle(-700)
     await drive_straight(800, velocity=1000) # return home
     return
@@ -366,8 +388,6 @@ async def tip_the_scales():
 async def forum():
     """
     M14: 25 (5 pt/obj)
-
-
     LINE UP [BLUE]: 3 black lines from left (left corner robot), 2 black lines on arc (right cage wall)
     """
     await gyro_drive_straight(-1075, velocity= 700)
@@ -432,9 +452,9 @@ async def main():
         run_name, run_function = runs[run_idx]
         if running:
             light.color(light.POWER, color.GREEN)
-            print("Run: ", run_name)
+            #print("Run: ", run_name)
             await run_function()
-            print("Run: ", run_name, " done!")
+            #print("Run: ", run_name, " done!")
             running = False
             changed = True
         else:
